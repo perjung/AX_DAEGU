@@ -7,6 +7,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { ResultScreen } from './components/ResultScreen';
 import { RefineScreen } from './components/RefineScreen';
 import { SuccessScreen } from './components/SuccessScreen';
+import { SubmissionCompleteScreen } from './components/SubmissionCompleteScreen';
 import { geminiService } from './services/geminiService';
 
 export default function App() {
@@ -34,6 +35,12 @@ export default function App() {
     setAnalysis(newAnalysis);
   };
 
+  const handleReset = () => {
+    setComplaint('');
+    setAnalysis(null);
+    setCurrentScreen('INPUT');
+  };
+
   return (
     <div className="min-h-screen bg-brand-ivory font-sans antialiased text-brand-navy selection:bg-brand-blue/10">
       <AnimatePresence mode="wait">
@@ -54,7 +61,7 @@ export default function App() {
             key="result" 
             analysis={analysis} 
             onRefine={() => setCurrentScreen('REFINE')}
-            onSubmit={() => alert('시청에 초안이 제출되었습니다. 시민님의 소중한 기부 감사드립니다!')}
+            onSubmit={() => setCurrentScreen('SUBMITTED')}
           />
         )}
 
@@ -73,6 +80,14 @@ export default function App() {
             key="success" 
             analysis={analysis}
             onContinue={() => setCurrentScreen('RESULT')}
+          />
+        )}
+
+        {currentScreen === 'SUBMITTED' && analysis && (
+          <SubmissionCompleteScreen 
+            key="submitted"
+            analysis={analysis}
+            onReset={handleReset}
           />
         )}
       </AnimatePresence>

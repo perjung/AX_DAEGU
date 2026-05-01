@@ -1,4 +1,4 @@
-export type Screen = 'SPLASH' | 'INPUT' | 'LOADING' | 'RESULT' | 'REFINE' | 'SUCCESS';
+export type Screen = 'SPLASH' | 'INPUT' | 'LOADING' | 'RESULT' | 'REFINE' | 'SUCCESS' | 'SUBMITTED';
 
 export interface PolicyMetric {
   label: string;
