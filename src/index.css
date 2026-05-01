@@ -1,0 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Public Sans", "Pretendard", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-ivory: #F8F7F4;
+  --color-brand-blue: #0058be;
+  --color-brand-navy: #191b23;
+  --color-brand-orange: #F97316;
+  --color-brand-success: #22C55E;
+}
+
+body {
+  @apply bg-brand-ivory text-brand-navy selection:bg-brand-blue/10;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.fill-icon {
+  font-variation-settings: 'FILL' 1;
+}
