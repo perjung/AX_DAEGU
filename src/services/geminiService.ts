@@ -59,6 +59,7 @@ export const geminiService = {
          - 근거 충분성
          - 실현 가능성
          - 대안 구체성
+         **중요: 최초 분석이므로 모든 지표의 increment는 0으로 설정하세요.**
       4. diagnostic: 현재 제안의 한계점과 보완이 필요한 이유를 1~2문장으로 설명.
       5. riskOfRejection: structuringLevel이 75점 미만이면 무조건 true, 75점 이상이면 false로 설정하세요.
 
@@ -85,16 +86,27 @@ export const geminiService = {
   },
 
   async getRefinementQuestion(analysis: AIAnalysis, history: any[]) {
+    const historyString = history
+      .filter(m => m.role !== 'system')
+      .map(m => `${m.role === 'user' ? '시민' : '분석관'}: ${m.content}`)
+      .join('\n');
+
     const prompt = `
-      당신은 시민의 제안을 돕는 '정책 분석관'입니다. 
-      현재 정책 제안의 완성도는 ${analysis.structuringLevel}% 입니다.
-      특히 ${analysis.metrics.find(m => m.value < 50)?.label || '근거 충분성'} 부분이 보완이 필요합니다.
+      당신은 시민의 제안을 돕는 전문적인 '정책 분석관'입니다. 
 
-      ${analysis.diagnostic}
+      [현재 분석 상태]
+      - 정책 제안 완성도: ${analysis.structuringLevel}%
+      - 보완 권고: ${analysis.diagnostic}
+      
+      [대화 요약]
+      ${historyString}
 
-      시민에게 부드럽고 전문적인 어조로, 제안을 더 구체화하기 위한 '단 하나의 핵심 질문'을 던지세요. 
-      게임 리프레임 기법을 사용해 "Round 1. 예산 문제 🔴" 같은 헤더를 포함해도 좋습니다.
-      질문은 시민이 대답하기 쉽도록 예시를 포함하세요.
+      [지침]
+      1. 사용자의 최근 답변이 정책의 완성도를 어떻게 높였는지 짧게(1문장) 칭찬하거나 격려하세요.
+      2. 만약 완성도가 85% 이상이라면, "제안이 충분히 무르익었습니다. 이제 행정 전문가 검토를 위해 제출하셔도 좋습니다."라고 마무리하세요.
+      3. 완성도가 아직 부족하다면, ${analysis.metrics.find(m => m.value < 70)?.label || '다음 단계'}를 보완하기 위한 '단 하나의' 구체적인 질문을 던지세요.
+      4. 반론(피드백)을 통해 시민의 아이디어를 깎아내리지 말고, "더 좋은 정책이 되려면 이 점이 필요해요"라는 관점으로 접근하세요.
+      5. "AI"라는 표현 대신 "우리 분석팀"이나 "저" 같은 표현을 사용하세요.
     `;
 
     try {
@@ -102,10 +114,10 @@ export const geminiService = {
         model: "gemini-3-flash-preview",
         contents: prompt,
       });
-      return result.text || "제안을 더 구체화하기 위해 도움이 필요합니다. 어떤 부분을 더 알고 싶으신가요?";
+      return result.text || "제안을 더 구체적으로 만들어주셔서 감사합니다. 추가로 보완하고 싶은 점이 있으신가요?";
     } catch (error) {
       console.error("Gemini Question Error:", error);
-      return "제안을 더 구체화하기 위해 도움이 필요합니다. 어떤 부분을 더 알고 싶으신가요?";
+      return "제안을 보완해주셔서 감사합니다. 혹시 더 덧붙이고 싶은 내용이 있으신가요?";
     }
   }
 };

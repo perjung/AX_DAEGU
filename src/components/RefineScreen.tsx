@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Gavel, ChevronLeft, Send, Stars } from "lucide-react";
+import { Gavel, ChevronLeft, Send, Stars, Target, Globe, Library, Wrench, Lightbulb } from "lucide-react";
 import { AIAnalysis, ChatMessage } from "../types";
 import { geminiService } from "../services/geminiService";
+import { SuccessScreen } from "./SuccessScreen";
 
 interface RefineScreenProps {
   analysis: AIAnalysis;
@@ -16,6 +17,7 @@ interface RefineScreenProps {
 export function RefineScreen({ analysis, messages, setMessages, onUpdate, onBack, onComplete }: RefineScreenProps) {
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [showGrowth, setShowGrowth] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,34 +42,52 @@ export function RefineScreen({ analysis, messages, setMessages, onUpdate, onBack
     if (!inputText.trim()) return;
 
     const userMsg: ChatMessage = { id: Date.now().toString(), role: "user", content: inputText };
-    setMessages(prev => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInputText("");
     setIsTyping(true);
 
     try {
-      const newScore = Math.min(95, analysis.structuringLevel + 25);
-      // Simulate analysis update
+      // 1. Calculate new score (gradual increase)
+      const jump = Math.floor(Math.random() * 8) + 7; // 7-15% increase per round
+      const newScore = Math.min(98, analysis.structuringLevel + jump);
+      
+      // 2. Simulate analysis update
       const updatedAnalysis: AIAnalysis = {
         ...analysis,
         structuringLevel: newScore,
         metrics: analysis.metrics.map(m => {
-          if (m.label === "근거 충분성" || m.label === "대안 구체성") {
-            return { ...m, value: Math.min(100, m.value + 25), increment: 25 };
-          }
-          return { ...m, increment: Math.floor(Math.random() * 5) };
+          const inc = m.value < 90 ? Math.floor(Math.random() * 10) + 3 : 0;
+          return {
+            ...m,
+            value: Math.min(100, m.value + inc),
+            increment: inc
+          };
         }),
-        riskOfRejection: newScore < 75,
-        diagnostic: newScore >= 75 
-          ? "보완 사항이 훌륭하게 반영되었습니다. 이제 정책의 설득력이 매우 높아져 통과 가능성이 큽니다."
-          : "보완이 진행되었으나 아직 구체적인 근거가 부족합니다. 한 라운드 더 진행하는 것을 권장합니다."
+        riskOfRejection: newScore < 80,
+        diagnostic: newScore >= 85 
+          ? "제안이 매우 충실해졌습니다. 이제 실무 부서에서 검토하기에 충분한 수준입니다."
+          : "좋은 답변입니다. 다만 구체적인 실행 계획에 대해 조금 더 고민해볼 필요가 있습니다."
       };
 
-      // In a real app, we might call Gemini again with the full history
-      // For this demo, we'll wait 2 seconds and trigger the success
+      // 3. Get next question/feedback from Gemini
+      const aiResponse = await geminiService.getRefinementQuestion(updatedAnalysis, newMessages);
+      
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: aiResponse
+      };
+
+      // 4. Update all states
+      setMessages(prev => [...prev, assistantMsg]);
+      onUpdate(updatedAnalysis);
+      setIsTyping(false);
+      
+      // 5. Show progress/growth modal after a short delay
       setTimeout(() => {
-        onUpdate(updatedAnalysis);
-        onComplete();
-      }, 2000);
+        setShowGrowth(true);
+      }, 500);
 
     } catch (error) {
       console.error(error);
@@ -92,18 +112,92 @@ export function RefineScreen({ analysis, messages, setMessages, onUpdate, onBack
         <div className="w-10" />
       </header>
 
-      {/* Sticky Progress Info */}
-      <div className="flex-shrink-0 bg-brand-ivory px-6 py-3 border-b border-gray-100">
-        <div className="flex justify-between items-center mb-1.5">
-          <span className="text-[10px] font-bold text-gray-400">정책 구조화 수준</span>
-          <span className="text-xs font-bold text-brand-success">{analysis.structuringLevel}% <span className="text-[10px] ml-1 opacity-70">(보완 중)</span></span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-          <motion.div 
-            initial={{ width: `${analysis.structuringLevel}%` }}
-            animate={{ width: `${analysis.structuringLevel + 5}%` }}
-            className="bg-brand-success h-full animate-pulse" 
-          />
+      {/* Sticky Progress Info & Metrics Overview */}
+      <div className="flex-shrink-0 bg-white px-4 py-4 shadow-sm border-b border-gray-100 z-10">
+        <div className="max-w-2xl mx-auto flex flex-col gap-3">
+          <div className="flex items-end justify-between">
+            {/* Percentage Section */}
+            <div className="flex flex-col items-start mr-4">
+              <span className="text-[13px] font-black text-gray-400 uppercase tracking-tight mb-1">정책구조화수준</span>
+              <div className="flex items-baseline gap-1 leading-none">
+                <span className="text-6xl font-black text-brand-blue tracking-tighter">{analysis.structuringLevel}</span>
+                <span className="text-xl font-bold text-gray-400">%</span>
+              </div>
+            </div>
+
+            {/* Compact Metrics Row with Labels (Enlarged) */}
+            <div className="flex-1 flex justify-end gap-5 overflow-x-auto pb-1 no-scrollbar">
+              {analysis.metrics.map((m, idx) => {
+                const Icon = {
+                  target: Target,
+                  public: Globe,
+                  library_books: Library,
+                  build: Wrench,
+                  lightbulb: Lightbulb,
+                }[m.icon] || Target;
+                
+                const isImproved = m.increment > 0;
+                const isDecreased = m.increment < 0;
+                
+                // New color logic: 
+                // Increased (increment > 0) -> Green
+                // Decreased (increment < 0) -> Orange
+                // No change / Initial (increment == 0) -> Gray/Blue (Default)
+                const getStatusStyles = () => {
+                  if (isImproved) return {
+                    icon: "text-brand-success",
+                    text: "text-brand-success",
+                    border: "border-green-200",
+                    bg: "bg-green-50/50"
+                  };
+                  if (isDecreased) return {
+                    icon: "text-brand-orange",
+                    text: "text-brand-orange",
+                    border: "border-brand-orange/30",
+                    bg: "bg-brand-orange/5"
+                  };
+                  return {
+                    icon: "text-brand-blue",
+                    text: "text-brand-navy",
+                    border: "border-gray-100",
+                    bg: "bg-gray-50/50"
+                  };
+                };
+
+                const styles = getStatusStyles();
+                
+                return (
+                  <div key={idx} className="flex flex-col items-center gap-1.5 min-w-[48px]">
+                    <span className="text-[11px] font-bold whitespace-nowrap text-gray-400">
+                      {m.label.length > 5 ? m.label.slice(0, 5) : m.label}
+                    </span>
+                    <div className={`p-2.5 rounded-2xl border transition-all ${styles.border} ${styles.bg}`}>
+                      <Icon size={18} className={styles.icon} />
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <span className={`text-sm font-black ${styles.text}`}>
+                        {m.value}
+                      </span>
+                      {m.increment !== 0 && (
+                        <span className={`text-[9px] font-bold ${m.increment > 0 ? 'text-brand-success' : 'text-brand-orange'}`}>
+                          {m.increment > 0 ? `+${m.increment}` : m.increment}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Long Horizontal Progress Bar */}
+          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <motion.div 
+              initial={{ width: `${analysis.structuringLevel}%` }}
+              animate={{ width: `${analysis.structuringLevel}%` }}
+              className="bg-brand-success h-full transition-all duration-1000" 
+            />
+          </div>
         </div>
       </div>
 
@@ -157,7 +251,37 @@ export function RefineScreen({ analysis, messages, setMessages, onUpdate, onBack
         <div ref={scrollRef} />
       </main>
 
-      <footer className="flex-shrink-0 p-4 bg-white border-t border-gray-100">
+      <footer className="flex-shrink-0 p-4 bg-white border-t border-gray-100 relative">
+        {/* Level Up / Success Modal Overlay */}
+        <AnimatePresence>
+          {showGrowth && (
+            <SuccessScreen 
+              analysis={analysis} 
+              onContinue={() => setShowGrowth(false)} 
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Submit Policy Button (Appears when score is high) */}
+        <AnimatePresence>
+          {analysis.structuringLevel >= 85 && (
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              className="absolute -top-16 left-0 right-0 flex justify-center pointer-events-none"
+            >
+              <button 
+                onClick={onComplete}
+                className="pointer-events-auto bg-brand-orange text-white px-6 py-2.5 rounded-full font-black text-sm shadow-xl flex items-center gap-2 hover:bg-orange-600 transition-all active:scale-95 border-b-4 border-orange-800"
+              >
+                <Stars size={18} />
+                최종 정책 제안서 완성하기
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="max-w-2xl mx-auto flex items-end gap-2">
           <textarea
             value={inputText}
