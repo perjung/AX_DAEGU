@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence } from "motion/react";
 import { Screen, AIAnalysis } from './types';
 import { SplashScreen } from './components/SplashScreen';
@@ -10,10 +10,53 @@ import { SuccessScreen } from './components/SuccessScreen';
 import { SubmissionCompleteScreen } from './components/SubmissionCompleteScreen';
 import { geminiService } from './services/geminiService';
 
+const STORAGE_KEY = 'euiui-isso-state';
+
+interface PersistedState {
+  currentScreen: Screen;
+  complaint: string;
+  analysis: AIAnalysis | null;
+  messages: ChatMessage[];
+}
+
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('SPLASH');
-  const [complaint, setComplaint] = useState('');
-  const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
+  const getInitialState = (): PersistedState => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.currentScreen === 'LOADING') {
+          return { ...parsed, currentScreen: 'INPUT' };
+        }
+        if (!parsed.messages) parsed.messages = [];
+        return parsed;
+      } catch (e) {
+        console.error("Failed to parse saved state", e);
+      }
+    }
+    return {
+      currentScreen: 'SPLASH',
+      complaint: '',
+      analysis: null,
+      messages: [],
+    };
+  };
+
+  const initialState = getInitialState();
+  const [currentScreen, setCurrentScreen] = useState<Screen>(initialState.currentScreen);
+  const [complaint, setComplaint] = useState(initialState.complaint);
+  const [analysis, setAnalysis] = useState<AIAnalysis | null>(initialState.analysis);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialState.messages);
+
+  useEffect(() => {
+    const stateToSave: PersistedState = {
+      currentScreen,
+      complaint,
+      analysis,
+      messages,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+  }, [currentScreen, complaint, analysis, messages]);
 
   const handleStartAnalysis = async (text: string) => {
     setComplaint(text);
@@ -25,7 +68,6 @@ export default function App() {
       setCurrentScreen('RESULT');
     } catch (error) {
       console.error(error);
-      // Fallback or retry logic
       setCurrentScreen('INPUT');
       alert('분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     }
@@ -38,7 +80,9 @@ export default function App() {
   const handleReset = () => {
     setComplaint('');
     setAnalysis(null);
+    setMessages([]);
     setCurrentScreen('INPUT');
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
@@ -69,6 +113,8 @@ export default function App() {
           <RefineScreen 
             key="refine" 
             analysis={analysis}
+            messages={messages}
+            setMessages={setMessages}
             onUpdate={handleUpdateAnalysis}
             onBack={() => setCurrentScreen('RESULT')}
             onComplete={() => setCurrentScreen('SUCCESS')}

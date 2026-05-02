@@ -6,19 +6,22 @@ import { geminiService } from "../services/geminiService";
 
 interface RefineScreenProps {
   analysis: AIAnalysis;
+  messages: ChatMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   onUpdate: (newAnalysis: AIAnalysis) => void;
   onBack: () => void;
   onComplete: () => void;
 }
 
-export function RefineScreen({ analysis, onUpdate, onBack, onComplete }: RefineScreenProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function RefineScreen({ analysis, messages, setMessages, onUpdate, onBack, onComplete }: RefineScreenProps) {
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const initChat = async () => {
+      if (messages.length > 0) return;
+      
       setIsTyping(true);
       const question = await geminiService.getRefinementQuestion(analysis, []);
       setMessages([{
@@ -31,7 +34,7 @@ export function RefineScreen({ analysis, onUpdate, onBack, onComplete }: RefineS
       setIsTyping(false);
     };
     initChat();
-  }, []);
+  }, [analysis, messages.length, setMessages]);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
