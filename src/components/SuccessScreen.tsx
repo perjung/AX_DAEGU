@@ -40,8 +40,12 @@ export function SuccessScreen({ analysis, onContinue }: { key?: string; analysis
           <div className="bg-brand-blue/10 rounded-full p-2 mb-2">
             <Stars size={32} className="text-brand-blue" fill="currentColor" />
           </div>
-          <h1 className="text-3xl font-black text-brand-blue tracking-tight">보완 성공!</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">정책 구조화 수준 레벨업</p>
+          <h1 className="text-3xl font-black text-brand-blue tracking-tight">
+            {totalJump > 0 ? "보완 성공!" : "의견 반영 완료"}
+          </h1>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            {totalJump > 0 ? "정책 구체화 수준 레벨업" : "정책 분석 업데이트"}
+          </p>
         </header>
 
         <section className="relative w-40 h-40 flex items-center justify-center">
@@ -72,8 +76,17 @@ export function SuccessScreen({ analysis, onContinue }: { key?: string; analysis
 
         <div className="bg-white border border-gray-100 rounded-2xl p-4 text-center shadow-sm w-full">
           <p className="text-sm leading-relaxed">
-            시민님의 답변으로 구체적인 내용이 보완되어<br />
-            <span className="text-brand-blue font-bold">{bestMetric?.label}</span>이 대폭 상승했습니다!
+            {totalJump > 0 ? (
+              <>
+                시민님의 답변으로 구체적인 내용이 보완되어<br />
+                <span className="text-brand-blue font-bold">{bestMetric?.label}</span>이 상승했습니다!
+              </>
+            ) : (
+              <>
+                시민님의 소중한 의견이 기록되었습니다.<br />
+                대화를 통해 제안을 더 다듬어 볼까요?
+              </>
+            )}
           </p>
         </div>
 
